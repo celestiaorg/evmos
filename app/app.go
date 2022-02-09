@@ -92,9 +92,11 @@ import (
 	porttypes "github.com/cosmos/ibc-go/v2/modules/core/05-port/types"
 	ibchost "github.com/cosmos/ibc-go/v2/modules/core/24-host"
 	ibckeeper "github.com/cosmos/ibc-go/v2/modules/core/keeper"
+	ibctesting "github.com/cosmos/ibc-go/v2/testing"
 
 	// unnamed import of statik for swagger UI support
 	_ "github.com/tharsis/ethermint/client/docs/statik"
+	"github.com/tharsis/ethermint/encoding"
 
 	"github.com/tharsis/ethermint/app/ante"
 	srvflags "github.com/tharsis/ethermint/server/flags"
@@ -108,6 +110,7 @@ import (
 	feemarketkeeper "github.com/tharsis/ethermint/x/feemarket/keeper"
 	feemarkettypes "github.com/tharsis/ethermint/x/feemarket/types"
 	"github.com/tharsis/evmos/x/intrarelayer"
+	irclient "github.com/tharsis/evmos/x/intrarelayer/client"
 	irk "github.com/tharsis/evmos/x/intrarelayer/keeper"
 	irt "github.com/tharsis/evmos/x/intrarelayer/types"
 )
@@ -142,6 +145,9 @@ var (
 		gov.NewAppModuleBasic(
 			paramsclient.ProposalHandler, distrclient.ProposalHandler, upgradeclient.ProposalHandler, upgradeclient.CancelProposalHandler,
 			ibcclientclient.UpdateClientProposalHandler, ibcclientclient.UpgradeProposalHandler,
+			// Evmos proposal types
+			irclient.RegisterCoinProposalHandler, irclient.RegisterERC20ProposalHandler,
+			irclient.ToggleTokenRelayProposalHandler, irclient.UpdateTokenPairERC20ProposalHandler,
 		),
 		params.AppModuleBasic{},
 		crisis.AppModuleBasic{},
@@ -177,9 +183,11 @@ var (
 	}
 )
 
-var _ simapp.App = (*Evmos)(nil)
-
-// var _ server.Application (*Evmos)(nil)
+var (
+	_ servertypes.Application = (*Evmos)(nil)
+	_ simapp.App              = (*Evmos)(nil)
+	_ ibctesting.TestingApp   = (*Evmos)(nil)
+)
 
 // Evmos implements an extended ABCI application. It is an application
 // that may process transactions through Ethereum's EVM running atop of
@@ -375,7 +383,7 @@ func NewEvmos(
 		AddRoute(distrtypes.RouterKey, distr.NewCommunityPoolSpendProposalHandler(app.DistrKeeper)).
 		AddRoute(upgradetypes.RouterKey, upgrade.NewSoftwareUpgradeProposalHandler(app.UpgradeKeeper)).
 		AddRoute(ibchost.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
-		AddRoute(irt.RouterKey, intrarelayer.NewIntrarelayerProposalHandler(app.IntrarelayerKeeper))
+		AddRoute(irt.RouterKey, intrarelayer.NewIntrarelayerProposalHandler(&app.IntrarelayerKeeper))
 
 	govKeeper := govkeeper.NewKeeper(
 		appCodec, keys[govtypes.StoreKey], app.GetSubspace(govtypes.ModuleName), app.AccountKeeper, app.BankKeeper,
@@ -394,6 +402,8 @@ func NewEvmos(
 			),
 		),
 	)
+
+	app.EvmKeeper = app.EvmKeeper.SetHooks(app.IntrarelayerKeeper)
 
 	// Create Transfer Keepers
 	app.TransferKeeper = ibctransferkeeper.NewKeeper(
@@ -715,6 +725,34 @@ func (app *Evmos) RegisterTxService(clientCtx client.Context) {
 
 func (app *Evmos) RegisterTendermintService(clientCtx client.Context) {
 	tmservice.RegisterTendermintService(app.BaseApp.GRPCQueryRouter(), clientCtx, app.interfaceRegistry)
+}
+
+// IBC Go TestingApp functions
+
+// GetBaseApp implements the TestingApp interface.
+func (app *Evmos) GetBaseApp() *baseapp.BaseApp {
+	return app.BaseApp
+}
+
+// GetStakingKeeper implements the TestingApp interface.
+func (app *Evmos) GetStakingKeeper() stakingkeeper.Keeper {
+	return app.StakingKeeper
+}
+
+// GetIBCKeeper implements the TestingApp interface.
+func (app *Evmos) GetIBCKeeper() *ibckeeper.Keeper {
+	return app.IBCKeeper
+}
+
+// GetScopedIBCKeeper implements the TestingApp interface.
+func (app *Evmos) GetScopedIBCKeeper() capabilitykeeper.ScopedKeeper {
+	return app.ScopedIBCKeeper
+}
+
+// GetTxConfig implements the TestingApp interface.
+func (app *Evmos) GetTxConfig() client.TxConfig {
+	cfg := encoding.MakeConfig(ModuleBasics)
+	return cfg.TxConfig
 }
 
 // RegisterSwaggerAPI registers swagger route with API Server

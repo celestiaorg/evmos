@@ -2,11 +2,13 @@ package types
 
 import (
 	"fmt"
+	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v2/modules/apps/transfer/types"
 	"github.com/ethereum/go-ethereum/common"
 	ethermint "github.com/tharsis/ethermint/types"
 )
@@ -15,7 +17,7 @@ import (
 const (
 	ProposalTypeRegisterCoin         string = "RegisterCoin"
 	ProposalTypeRegisterERC20        string = "RegisterERC20"
-	ProposalTypeToggleTokenRelay     string = "ToggleTokenRelay" // nolint: gosec
+	ProposalTypeToggleTokenRelay     string = "ToggleTokenRelay" // #nosec
 	ProposalTypeUpdateTokenPairERC20 string = "UpdateTokenPairERC20"
 )
 
@@ -38,12 +40,14 @@ func init() {
 	govtypes.RegisterProposalTypeCodec(&UpdateTokenPairERC20Proposal{}, "intrarelayer/UpdateTokenPairERC20Proposal")
 }
 
+// CreateDenomDescription generates a string with the coin description
 func CreateDenomDescription(address string) string {
 	return fmt.Sprintf("Cosmos coin token representation of %s", address)
 }
 
+// CreateDenom generates a string the module name plus the address to avoid conflicts with names staring with a number
 func CreateDenom(address string) string {
-	return fmt.Sprintf("irm%s", address)
+	return fmt.Sprintf("%s/%s", ModuleName, address)
 }
 
 // NewRegisterCoinProposal returns new instance of RegisterCoinProposal
@@ -69,7 +73,52 @@ func (rtbp *RegisterCoinProposal) ValidateBasic() error {
 		return err
 	}
 
+	if err := ibctransfertypes.ValidateIBCDenom(rtbp.Metadata.Base); err != nil {
+		return err
+	}
+
+	if err := validateIBC(rtbp.Metadata); err != nil {
+		return err
+	}
+
 	return govtypes.ValidateAbstract(rtbp)
+}
+
+func validateIBC(metadata banktypes.Metadata) error {
+	// Check ibc/ denom
+	denomSplit := strings.SplitN(metadata.Base, "/", 2)
+
+	if denomSplit[0] == metadata.Base && strings.TrimSpace(metadata.Base) != "" {
+		// Not IBC
+		return nil
+	}
+
+	if len(denomSplit) != 2 || denomSplit[0] != ibctransfertypes.DenomPrefix {
+		// NOTE: should be unaccessible (covered on ValidateIBCDenom)
+		return fmt.Errorf("invalid metadata. %s denomination should be prefixed with the format 'ibc/", metadata.Base)
+	}
+
+	if !strings.Contains(metadata.Name, "channel-") {
+		return fmt.Errorf("invalid metadata (Name) for ibc. %s should include channel", metadata.Name)
+	}
+
+	if !strings.HasPrefix(metadata.Symbol, "ibc") {
+		return fmt.Errorf("invalid metadata (Symbol) for ibc. %s should include \"ibc\" prefix", metadata.Symbol)
+	}
+
+	return nil
+}
+
+// ValidateIntrarelayerDenom checks if a denom is a valid intrarelayer/
+// denomination
+func ValidateIntrarelayerDenom(denom string) error {
+	denomSplit := strings.SplitN(denom, "/", 2)
+
+	if len(denomSplit) != 2 || denomSplit[0] != ModuleName {
+		return fmt.Errorf("invalid denom. %s denomination should be prefixed with the format 'intrarelayer/", denom)
+	}
+
+	return ethermint.ValidateAddress(denomSplit[1])
 }
 
 // NewRegisterERC20Proposal returns new instance of RegisterERC20Proposal
@@ -128,12 +177,12 @@ func (etrp *ToggleTokenRelayProposal) ValidateBasic() error {
 }
 
 // NewUpdateTokenPairERC20Proposal returns new instance of UpdateTokenPairERC20Proposal
-func NewUpdateTokenPairERC20Proposal(title, description string, erc20Addr, newERC20Addr common.Address) govtypes.Content {
+func NewUpdateTokenPairERC20Proposal(title, description, erc20Addr, newERC20Addr string) govtypes.Content {
 	return &UpdateTokenPairERC20Proposal{
 		Title:           title,
 		Description:     description,
-		Erc20Address:    erc20Addr.String(),
-		NewErc20Address: newERC20Addr.String(),
+		Erc20Address:    erc20Addr,
+		NewErc20Address: newERC20Addr,
 	}
 }
 

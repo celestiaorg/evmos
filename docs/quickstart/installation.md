@@ -57,14 +57,19 @@ evmosd version
 You can build {{ $themeConfig.project.name }} using Docker by running:
 
 ```bash
-make docker-build
+make build-docker
 ```
 
-This will install the binaries on the `./build` directory. Now, check that the binaries have been
-successfully installed:
+The command above will create a docker container: `tharsishq/evmos:latest`. Now you can run `evmosd` in the container.
 
 ```bash
-evmosd version
+docker run -it -p 26657:26657 -p 26656:26656 -v ~/.evmosd/:/root/.evmosd tharsishq/evmos:latest evmosd version
+
+# To initialize
+# docker run -it -p 26657:26657 -p 26656:26656 -v ~/.evmosd/:/root/.evmosd tharsishq/evmos:latest evmosd init test-chain --chain-id test_9000-2
+
+# To run
+# docker run -it -p 26657:26657 -p 26656:26656 -v ~/.evmosd/:/root/.evmosd tharsishq/evmos:latest evmosd start
 ```
 
 ### Releases

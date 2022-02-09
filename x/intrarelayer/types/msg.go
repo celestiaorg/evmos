@@ -4,6 +4,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
+	ibctransfertypes "github.com/cosmos/ibc-go/v2/modules/apps/transfer/types"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -34,9 +35,12 @@ func (msg MsgConvertCoin) Type() string { return TypeMsgConvertCoin }
 
 // ValidateBasic runs stateless checks on the message
 func (msg MsgConvertCoin) ValidateBasic() error {
-	if err := sdk.ValidateDenom(msg.Coin.Denom); err != nil {
-		return err
+	if err := ValidateIntrarelayerDenom(msg.Coin.Denom); err != nil {
+		if err := ibctransfertypes.ValidateIBCDenom(msg.Coin.Denom); err != nil {
+			return err
+		}
 	}
+
 	if !msg.Coin.Amount.IsPositive() {
 		return sdkerrors.Wrapf(sdkerrors.ErrInvalidCoins, "cannot mint a non-positive amount")
 	}
