@@ -71,7 +71,15 @@ dependency-graph.png
 
 # Node.js
 **/node_modules
-
+tests/**/node_modules/*
+tests-solidity/**/node_modules/*
 
 # OpenZeppelin contracts
 contracts/@openzeppelin/*
+
+# Ethermint
+ethermint
+
+# Optimint
+optimint
+

@@ -1,13 +1,22 @@
-name: "docker-build"
+name: docker-build-debug
 
 on:
   push:
     branches:
-      - "main"
+      - '**'
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - 'main'
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
-  docker-build:
+  build:
     runs-on: "ubuntu-latest"
     permissions:
       contents: write 
@@ -15,12 +24,13 @@ jobs:
     steps:
       - name: "Checkout source code"
         uses: "actions/checkout@v2"
-      - name: Set up Go
-        uses: actions/setup-go@v2
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v3
         with:
-          go-version: 1.17
-      - name: "Build"
-        run: "make build"
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,suffix=-debug
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -34,6 +44,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
+          context: .
+          platforms: linux/amd64, linux/arm64
           push: true
-          tags: ghcr.io/celestiaorg/celestia-node:latest
-          file: docker/Dockerfile
+          tags: ${{ steps.meta.outputs.tags }}
+          file: docker/debug.Dockerfile
