@@ -29,7 +29,10 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 )
 
-require github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+require (
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
+	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+)
 
 require (
 	filippo.io/edwards25519 v1.0.0-beta.2 // indirect
@@ -42,7 +45,7 @@ require (
 	github.com/allegro/bigcache v1.2.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/speakeasy v0.1.0 // indirect
-	github.com/btcsuite/btcd v0.22.0-beta // indirect
+	github.com/btcsuite/btcd v0.24.0 // indirect
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce // indirect
 	github.com/celestiaorg/optimint v0.1.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.1 // indirect
